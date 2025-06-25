@@ -1,0 +1,51 @@
+name: Sync upstream
+
+on:
+  workflow_dispatch: # manual trigger
+  schedule:
+    - cron: '0 8 * * *' # daily at 8am UTC
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          persist-credentials: false
+          fetch-depth: 0  # important: fetch full history
+
+      - name: Setup git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add upstream remote and fetch
+        run: |
+          git remote add upstream https://github.com/Vendicated/Vencord.git
+          git fetch upstream
+
+      - name: Check if upstream is ahead
+        id: check
+        run: |
+          upstream_commit=$(git rev-parse upstream/main)
+          local_commit=$(git rev-parse origin/main)
+
+          echo "Upstream: $upstream_commit"
+          echo "Local: $local_commit"
+
+          if [ "$upstream_commit" != "$local_commit" ]; then
+            echo "Upstream is ahead. Merge needed."
+            echo "merge_needed=true" >> $GITHUB_ENV
+          else
+            echo "No changes. No merge needed."
+            echo "merge_needed=false" >> $GITHUB_ENV
+          fi
+
+      - name: Merge and push if needed
+        if: env.merge_needed == 'true'
+        run: |
+          git merge upstream/main
+          git push origin main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
