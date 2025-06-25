@@ -1,9 +1,9 @@
 name: Sync upstream
 
 on:
-  workflow_dispatch: # manual trigger
+  workflow_dispatch: # Allows manual triggering of the workflow
   schedule:
-    - cron: '0 8 * * *' # daily at 8am UTC
+    - cron: '0 8 * * *' # Runs every day at 08:00 UTC
 
 jobs:
   sync:
@@ -13,7 +13,7 @@ jobs:
         uses: actions/checkout@v3
         with:
           persist-credentials: false
-          fetch-depth: 0  # important: fetch full history
+          fetch-depth: 0
 
       - name: Setup git config
         run: |
@@ -42,10 +42,17 @@ jobs:
             echo "merge_needed=false" >> $GITHUB_ENV
           fi
 
-      - name: Merge and push if needed
+      - name: Merge upstream changes
         if: env.merge_needed == 'true'
         run: |
           git merge upstream/main
+
+      - name: Set up authenticated push
+        if: env.merge_needed == 'true'
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
+      - name: Push changes
+        if: env.merge_needed == 'true'
+        run: |
           git push origin main
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
