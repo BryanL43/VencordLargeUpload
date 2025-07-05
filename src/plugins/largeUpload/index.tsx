@@ -81,25 +81,49 @@ async function resolveFile(options: Argument[], ctx: CommandContext): Promise<Fi
 
 async function uploadFile(file: File, channelId: string) {
     try {
-        const arrayBuffer = await file.arrayBuffer();
+        const fileSize = file.size;
         const fileType = file.type;
 
-        // Prompt the server for a presigned URL
-        const serverResponse = await Native.promptPresignedURL("https://api.largeupload.cloud/generate-upload");
-        const presignedUrl = serverResponse.uploadUrl;
-        const embedUrl = serverResponse.pageUrl;
+        // Request presigned URLs and upload parameters from backend
+        const { uploadId, key, numParts, partSize, presignedUrls } =
+            await Native.promptPresignedURL(
+                "https://api.largeupload.cloud/generate-upload",
+                fileSize,
+                fileType
+            );
+
+        console.log("Parts:", numParts, "Part size:", partSize);
+
+        const arrayBuffer = await file.arrayBuffer();
+        const eTags = await Native.uploadFilePartsToCloud(
+            arrayBuffer,
+            presignedUrls,
+            file.type,
+            partSize
+        );
+
+        const completeUploadResponse = await Native.completeUpload(
+            "https://api.largeupload.cloud/complete-upload",
+            uploadId,
+            key,
+            eTags
+        );
+
+        console.log("Upload completed successfully.");
+
+        UploadManager.clearAll(channelId, DraftType.SlashCommand);
 
         // Upload the file
-        const uploadResult = await Native.uploadFileToCloud(presignedUrl, arrayBuffer, fileType);
-        if (uploadResult === 200) {
-            setTimeout(() => sendTextToChat(`${embedUrl} `), 10);
-            UploadManager.clearAll(channelId, DraftType.SlashCommand);
-        } else {
-            console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", uploadResult);
-            sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
-            showToast("File Upload Failed", Toasts.Type.FAILURE);
-            UploadManager.clearAll(channelId, DraftType.SlashCommand);
-        }
+        // const uploadResult = await Native.uploadFileToCloud(presignedUrl, arrayBuffer, fileType);
+        // if (uploadResult) {
+        //     // setTimeout(() => sendTextToChat(`${embedUrl} `), 10);
+        //     // UploadManager.clearAll(channelId, DraftType.SlashCommand);
+        // } else {
+        //     console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", uploadResult);
+        //     sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
+        //     showToast("File Upload Failed", Toasts.Type.FAILURE);
+        //     UploadManager.clearAll(channelId, DraftType.SlashCommand);
+        // }
     } catch (error) {
         console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", error);
         sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
@@ -107,6 +131,7 @@ async function uploadFile(file: File, channelId: string) {
         UploadManager.clearAll(channelId, DraftType.SlashCommand);
     }
 }
+
 
 function triggerFileUpload() {
     const fileInput = document.createElement("input");
