@@ -1,6 +1,0 @@
-services:
-  vencord-builder:
-    build: .
-    volumes:
-      - .:/app  # bind-mount local project into container
-    command: pnpm build
