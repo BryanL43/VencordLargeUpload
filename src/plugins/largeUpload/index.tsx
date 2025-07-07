@@ -81,20 +81,23 @@ async function resolveFile(options: Argument[], ctx: CommandContext): Promise<Fi
 
 async function uploadFile(file: File, channelId: string) {
     try {
+        const fileName = file.name;
         const fileSize = file.size;
         const fileType = file.type;
 
         // Request presigned URLs and upload parameters from backend
-        const { uploadId, key, numParts, partSize, presignedUrls } =
+        const { uploadId, key, partSize, presignedUrls, embedUrl } =
             await Native.promptPresignedURL(
                 "https://api.largeupload.cloud/generate-upload",
+                fileName,
                 fileSize,
                 fileType
             );
 
-        console.log("Parts:", numParts, "Part size:", partSize);
-
+        // Take the file's buffer first due to Native limitations (electron bypassing CSP)
         const arrayBuffer = await file.arrayBuffer();
+
+        // Upload the individual parts to their respective presigned URLs
         const eTags = await Native.uploadFilePartsToCloud(
             arrayBuffer,
             presignedUrls,
@@ -102,6 +105,7 @@ async function uploadFile(file: File, channelId: string) {
             partSize
         );
 
+        // Complete the upload (Lambda reassembles all uploaded parts)
         const completeUploadResponse = await Native.completeUpload(
             "https://api.largeupload.cloud/complete-upload",
             uploadId,
@@ -109,21 +113,15 @@ async function uploadFile(file: File, channelId: string) {
             eTags
         );
 
-        console.log("Upload completed successfully.");
+        if (completeUploadResponse.message === "Success") {
+            setTimeout(() => sendTextToChat(`${embedUrl} `), 10);
 
-        UploadManager.clearAll(channelId, DraftType.SlashCommand);
-
-        // Upload the file
-        // const uploadResult = await Native.uploadFileToCloud(presignedUrl, arrayBuffer, fileType);
-        // if (uploadResult) {
-        //     // setTimeout(() => sendTextToChat(`${embedUrl} `), 10);
-        //     // UploadManager.clearAll(channelId, DraftType.SlashCommand);
-        // } else {
-        //     console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", uploadResult);
-        //     sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
-        //     showToast("File Upload Failed", Toasts.Type.FAILURE);
-        //     UploadManager.clearAll(channelId, DraftType.SlashCommand);
-        // }
+        } else {
+            console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", completeUploadResponse.message);
+            sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
+            showToast("File Upload Failed", Toasts.Type.FAILURE);
+            UploadManager.clearAll(channelId, DraftType.SlashCommand);
+        }
     } catch (error) {
         console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", error);
         sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });

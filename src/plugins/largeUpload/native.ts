@@ -7,9 +7,9 @@
 export interface MultipartUploadResponse {
     uploadId: string;
     key: string;
-    numParts: number;
     partSize: number;
     presignedUrls: { partNumber: number; url: string; }[];
+    embedUrl: string;
 }
 
 export interface PartUploadResult {
@@ -17,12 +17,18 @@ export interface PartUploadResult {
     eTag: string | null;
 }
 
-export async function promptPresignedURL(_, url: string, fileSize: number, fileType: string): Promise<MultipartUploadResponse> {
+export async function promptPresignedURL(
+    _, url: string,
+    name:string,
+    fileSize: number,
+    fileType: string
+): Promise<MultipartUploadResponse> {
     try {
         const options: RequestInit = {
             method: "POST",
             redirect: "follow",
             body: JSON.stringify({
+                "fileName": name,
                 "fileSize": fileSize,
                 "contentType": fileType
             })
@@ -78,12 +84,8 @@ export async function uploadFilePartsToCloud(
         const end = Math.min(start + partSize, buffer.length);
         const chunk = buffer.subarray(start, end);
 
-        console.log(`Starting upload for part #${partNumber} (${chunk.length} bytes)`);
-
         return uploadChunkToS3(url, chunk, contentType)
             .then(eTag => {
-                console.log(`Completed upload for part #${partNumber}, ETag:`, eTag);
-
                 return {
                     PartNumber: partNumber,
                     ETag: eTag
@@ -119,15 +121,8 @@ export async function completeUpload(
         };
 
         const response = await fetch(url, options);
-        if (!response.ok) {
-            const text = await response.text();
-            console.error("Complete upload failed:", text);
-            throw new Error(`Complete upload failed with status ${response.status}`);
-        }
-
-        const completeResponse = await response.json();
-
-        console.log("Multipart upload completed successfully.");
+        const result = await response.json();
+        return result;
     } catch (error) {
         console.error("Error during fetch request:", error);
         throw error;
