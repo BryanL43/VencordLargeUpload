@@ -13,6 +13,9 @@ try {
     if (!commandExists("pnpm")) {
         console.log("Installing pnpm...");
         execSync("npm install -g pnpm@latest-10", { stdio: "inherit" });
+
+        console.log("Installing dependencies...");
+        execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
     } else {
         const version = execSync("pnpm --version").toString().trim();
         console.log(`pnpm already installed. Version: ${version}`);
