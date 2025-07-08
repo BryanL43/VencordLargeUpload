@@ -19,6 +19,9 @@ try {
     } else {
         const version = execSync("pnpm --version").toString().trim();
         console.log(`pnpm already installed. Version: ${version}`);
+
+        console.log("Installing dependencies...");
+        execSync("pnpm install --frozen-lockfile", { stdio: "inherit" });
     }
 
     console.log("Running pnpm build...");
