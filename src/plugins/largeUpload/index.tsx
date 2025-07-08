@@ -46,8 +46,8 @@ const settings = definePluginSettings({
     autoSend: {
         type: OptionType.SELECT,
         options: [
-            { label: "Yes", value: "Yes" },
-            { label: "No", value: "No", default: true },
+            { label: "Yes", value: "Yes", default: true },
+            { label: "No", value: "No" },
         ],
         description: "Auto-Send",
         hidden: true
@@ -60,12 +60,12 @@ const settings = definePluginSettings({
     }
 });
 
-function sendTextToChat(text: string) {
+function sendTextToChat(text: string, channelId?: string) {
     if (settings.store.autoSend === "No") {
         insertTextIntoChatInputBox(text);
     } else {
-        const channelId = SelectedChannelStore.getChannelId();
-        sendMessage(channelId, { content: text });
+        const targetChannelId = channelId ?? SelectedChannelStore.getChannelId();
+        sendMessage(targetChannelId, { content: text });
     }
 }
 
@@ -84,6 +84,8 @@ async function uploadFile(file: File, channelId: string) {
         const fileName = file.name;
         const fileSize = file.size;
         const fileType = file.type;
+
+        showToast("Uploading... This may take a moment.", Toasts.Type.MESSAGE);
 
         // Request presigned URLs and upload parameters from backend
         const { uploadId, key, partSize, presignedUrls, embedUrl } =
@@ -114,8 +116,9 @@ async function uploadFile(file: File, channelId: string) {
         );
 
         if (completeUploadResponse.message === "Success") {
-            setTimeout(() => sendTextToChat(`${embedUrl} `), 10);
-
+            setTimeout(() => sendTextToChat(`${embedUrl} `, channelId), 10);
+            showToast("Upload complete!", Toasts.Type.SUCCESS);
+            UploadManager.clearAll(channelId, DraftType.SlashCommand);
         } else {
             console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", completeUploadResponse.message);
             sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
@@ -140,7 +143,16 @@ function triggerFileUpload() {
         const target = event.target as HTMLInputElement;
         if (target && target.files && target.files.length > 0) {
             const file = target.files[0];
-            if (file) {
+            if (file.size < 10 * 1024 * 1024) {
+                // showToast("File is too small");
+                console.log(
+                    Object.keys(UploadStore).filter(key => typeof UploadStore[key] === "function")
+                );
+                UploadStore.addFile(file);
+                return;
+            }
+
+            if (file && file.size >= 10 * 1024 * 1024) {
                 const channelId = SelectedChannelStore.getChannelId();
                 await uploadFile(file, channelId);
             } else {

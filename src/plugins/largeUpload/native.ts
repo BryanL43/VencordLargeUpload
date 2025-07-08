@@ -19,7 +19,7 @@ export interface PartUploadResult {
 
 export async function promptPresignedURL(
     _, url: string,
-    name:string,
+    name: string,
     fileSize: number,
     fileType: string
 ): Promise<MultipartUploadResponse> {
@@ -73,7 +73,7 @@ async function uploadChunkToS3(
 export async function uploadFilePartsToCloud(
     _,
     arrayBuffer: ArrayBuffer,
-    presignedUrls: { partNumber: number; url: string }[],
+    presignedUrls: { partNumber: number; url: string; }[],
     contentType: string,
     partSize: number
 ) {
