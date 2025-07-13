@@ -80,6 +80,25 @@ async function resolveFile(options: CommandArgument[], ctx: CommandContext): Pro
     return null;
 }
 
+async function runWithConcurrencyLimit<T>(
+    tasks: (() => Promise<T>)[],
+    concurrency: number
+): Promise<T[]> {
+    const results: T[] = [];
+    let index = 0;
+
+    const workers = Array(concurrency).fill(null).map(async () => {
+        while (index < tasks.length) {
+            const currentIndex = index++;
+            const task = tasks[currentIndex];
+            results[currentIndex] = await task();
+        }
+    });
+
+    await Promise.all(workers);
+    return results;
+}
+
 async function uploadFile(file: File, channelId: string, botMessage: Message) {
     try {
         const fileName = file.name;
@@ -96,15 +115,94 @@ async function uploadFile(file: File, channelId: string, botMessage: Message) {
             );
 
         // Take the file's buffer first due to Native limitations (electron bypassing CSP)
-        const arrayBuffer = await file.arrayBuffer();
+        // const arrayBuffer = await file.arrayBuffer();
+
+        const totalParts = presignedUrls.length;
+
+        // const eTags: { PartNumber: number; ETag: string; }[] = [];
+        let completedParts = 0;
+
+        const tasks = presignedUrls.map(({ partNumber, url }) => {
+            return async () => {
+                const start = (partNumber - 1) * partSize;
+                const end = Math.min(start + partSize, file.size);
+
+                const blobSlice = file.slice(start, end);
+                const chunkBuffer = await blobSlice.arrayBuffer();
+
+                const eTag = await Native.uploadChunkToS3(
+                    url,
+                    chunkBuffer,
+                    fileType
+                );
+
+                completedParts++;
+                const percent = Math.round((completedParts / totalParts) * 100);
+                const progressBar = `[${"█".repeat(percent / 10)}${"-".repeat(10 - percent / 10)}]`;
+
+                FluxDispatcher.dispatch({
+                    type: "MESSAGE_UPDATE",
+                    channelId,
+                    message: {
+                        id: botMessage.id,
+                        channel_id: channelId,
+                        embeds: [
+                            {
+                                title: `📤 Uploading File... [${percent}%]`,
+                                description: `Progress: ${progressBar} ${percent}%`,
+                                color: 0x57F287,
+                                type: "rich"
+                            }
+                        ]
+                    }
+                });
+
+                return {
+                    PartNumber: partNumber,
+                    ETag: eTag
+                };
+            };
+        });
+
+        const eTags = await runWithConcurrencyLimit(tasks, 20);
+
+        // for (const { partNumber, url } of presignedUrls) {
+        //     const start = (partNumber - 1) * partSize;
+        //     const end = Math.min(start + partSize, file.size);
+
+        //     const blobSlice = file.slice(start, end);
+        //     const chunkBuffer = await blobSlice.arrayBuffer();
+
+        //     eTags.push({ PartNumber: partNumber, ETag: await Native.uploadChunkToS3(url, chunkBuffer, fileType) });
+
+        //     const percent = Math.round((partNumber / totalParts) * 100);
+        //     const progressBar = `[${"█".repeat(percent / 10)}${"-".repeat(10 - percent / 10)}]`;
+
+        //     FluxDispatcher.dispatch({
+        //         type: "MESSAGE_UPDATE",
+        //         channelId,
+        //         message: {
+        //             id: botMessage.id,
+        //             channel_id: channelId,
+        //             embeds: [
+        //                 {
+        //                     title: `📤 Uploading File... [${percent}%]`,
+        //                     description: `Progress: ${progressBar} ${percent}%`,
+        //                     color: 0x57F287,
+        //                     type: "rich"
+        //                 }
+        //             ]
+        //         }
+        //     });
+        // }
 
         // Upload the individual parts to their respective presigned URLs
-        const eTags = await Native.uploadFilePartsToCloud(
-            arrayBuffer,
-            presignedUrls,
-            file.type,
-            partSize
-        );
+        // const eTags = await Native.uploadFilePartsToCloud(
+        //     arrayBuffer,
+        //     presignedUrls,
+        //     file.type,
+        //     partSize
+        // );
 
         // Complete the upload (Lambda reassembles all uploaded parts)
         const completeUploadResponse = await Native.completeUpload(

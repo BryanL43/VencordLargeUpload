@@ -47,16 +47,17 @@ export async function promptPresignedURL(
     }
 }
 
-async function uploadChunkToS3(
+export async function uploadChunkToS3(
+    _,
     url: string,
-    chunk: Buffer,
+    chunk: ArrayBuffer,
     contentType: string
 ) {
     const res = await fetch(url, {
         method: "PUT",
         headers: {
             "Content-Type": contentType,
-            "Content-Length": chunk.length.toString()
+            "Content-Length": chunk.byteLength.toString()
         },
         body: chunk
     });
@@ -88,33 +89,33 @@ async function runWithConcurrencyLimit<T>(
     return results;
 }
 
-export async function uploadFilePartsToCloud(
-    _,
-    arrayBuffer: ArrayBuffer,
-    presignedUrls: { partNumber: number; url: string; }[],
-    contentType: string,
-    partSize: number
-) {
-    const buffer = Buffer.from(arrayBuffer);
+// export async function uploadFilePartsToCloud(
+//     _,
+//     arrayBuffer: ArrayBuffer,
+//     presignedUrls: { partNumber: number; url: string; }[],
+//     contentType: string,
+//     partSize: number
+// ) {
+//     const buffer = Buffer.from(arrayBuffer);
 
-    const tasks = presignedUrls.map(({ partNumber, url }) => {
-        return async () => {
-            const start = (partNumber - 1) * partSize;
-            const end = Math.min(start + partSize, buffer.length);
-            const chunk = buffer.subarray(start, end);
+//     const tasks = presignedUrls.map(({ partNumber, url }) => {
+//         return async () => {
+//             const start = (partNumber - 1) * partSize;
+//             const end = Math.min(start + partSize, buffer.length);
+//             const chunk = buffer.subarray(start, end);
 
-            const eTag = await uploadChunkToS3(url, chunk, contentType);
-            return {
-                PartNumber: partNumber,
-                ETag: eTag
-            };
-        };
-    });
+//             const eTag = await uploadChunkToS3(url, chunk, contentType);
+//             return {
+//                 PartNumber: partNumber,
+//                 ETag: eTag
+//             };
+//         };
+//     });
 
-    const eTags = await runWithConcurrencyLimit(tasks, 20);
+//     const eTags = await runWithConcurrencyLimit(tasks, 20);
 
-    return eTags;
-}
+//     return eTags;
+// }
 
 export async function completeUpload(
     _,
