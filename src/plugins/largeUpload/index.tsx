@@ -11,9 +11,9 @@ import { OpenExternalIcon } from "@components/Icons";
 import { Devs } from "@utils/constants";
 import { insertTextIntoChatInputBox, sendMessage } from "@utils/discord";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
-import { CommandArgument, CommandContext } from "@vencord/discord-types";
+import { CommandArgument, CommandContext, Message } from "@vencord/discord-types";
 import { findByPropsLazy } from "@webpack";
-import { DraftType, FluxDispatcher, Forms, Menu, PermissionsBits, PermissionStore, React, SelectedChannelStore, showToast, Switch, Toasts, UploadManager, UserStore } from "@webpack/common";
+import { DraftType, FluxDispatcher, Forms, Menu, PermissionsBits, PermissionStore, React, SelectedChannelStore, showToast, Switch, Toasts, UploadManager } from "@webpack/common";
 
 const Native = VencordNative.pluginHelpers.LargeFileUpload as PluginNative<typeof import("./native")>;
 
@@ -80,13 +80,11 @@ async function resolveFile(options: CommandArgument[], ctx: CommandContext): Pro
     return null;
 }
 
-async function uploadFile(file: File, channelId: string) {
+async function uploadFile(file: File, channelId: string, botMessage: Message) {
     try {
         const fileName = file.name;
         const fileSize = file.size;
         const fileType = file.type;
-
-        showToast("Uploading... This may take a moment.", Toasts.Type.MESSAGE);
 
         // Request presigned URLs and upload parameters from backend
         const { uploadId, fileKey, partSize, presignedUrls } =
@@ -119,57 +117,59 @@ async function uploadFile(file: File, channelId: string) {
             fileType
         );
 
-        console.log(completeUploadResponse);
-
         // Send success message
         if (completeUploadResponse !== undefined) {
             setTimeout(() => sendTextToChat(`${completeUploadResponse.embedUrl} `, channelId), 10);
-            showToast("Upload complete!", Toasts.Type.SUCCESS);
+            showToast("SUCCESS: File Upload Complete!", Toasts.Type.SUCCESS);
+            FluxDispatcher.dispatch({
+                type: "MESSAGE_DELETE",
+                channelId,
+                id: botMessage.id
+            });
             UploadManager.clearAll(channelId, DraftType.SlashCommand);
         } else {
             console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", completeUploadResponse.message);
-            sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
-            showToast("File Upload Failed", Toasts.Type.FAILURE);
+            showToast("ERROR: File Upload Failed!", Toasts.Type.FAILURE);
+            sendBotMessage(channelId, {
+                embeds: [
+                    {
+                        title: "❌ ERROR: File Upload Failed!",
+                        description: "Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN.",
+                        // @ts-expect-error
+                        color: 0xFF0000,
+                        type: "rich"
+                    }
+                ]
+            });
+            FluxDispatcher.dispatch({
+                type: "MESSAGE_DELETE",
+                channelId,
+                id: botMessage.id
+            });
             UploadManager.clearAll(channelId, DraftType.SlashCommand);
         }
     } catch (error) {
         console.error("Unable to upload file. This is likely an issue with your network connection, firewall, or VPN.", error);
-        sendBotMessage(channelId, { content: "**Unable to upload file.** Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN." });
-        showToast("File Upload Failed", Toasts.Type.FAILURE);
+        showToast("ERROR: File Upload Failed!", Toasts.Type.FAILURE);
+        sendBotMessage(channelId, {
+            embeds: [
+                {
+                    title: "❌ ERROR: File Upload Failed!",
+                    description: "Check the console for more info. \n-# This is likely an issue with your network connection, firewall, or VPN.",
+                    // @ts-expect-error
+                    color: 0xFF0000,
+                    type: "rich"
+                }
+            ]
+        });
+        FluxDispatcher.dispatch({
+            type: "MESSAGE_DELETE",
+            channelId,
+            id: botMessage.id
+        });
         UploadManager.clearAll(channelId, DraftType.SlashCommand);
     }
 }
-
-function sendGhostUploadMessage(channelId, filename, progress) {
-    const currentUser = UserStore.getCurrentUser();
-
-    const fakeMessage = {
-        id: crypto.randomUUID(),
-        type: 0,
-        channel_id: channelId,
-        author: {
-            id: currentUser.id,
-            username: currentUser.username,
-            discriminator: currentUser.discriminator,
-            avatar: currentUser.avatar,
-            bot: false
-        },
-        content: "Hello", // leave empty if you only want custom content
-        timestamp: new Date(),
-        // customRenderedContent: createElement(
-        //     "div",
-        //     { style: { color: "orange" } },
-        //     `Uploading ${filename}... ${progress}%`
-        // )
-    };
-
-    FluxDispatcher.dispatch({
-        type: "MESSAGE_CREATE",
-        channelId,
-        message: fakeMessage
-    });
-}
-
 
 function triggerFileUpload() {
     const fileInput = document.createElement("input");
@@ -181,18 +181,36 @@ function triggerFileUpload() {
         if (target && target.files && target.files.length > 0) {
             const file = target.files[0];
             if (file.size < 10 * 1024 * 1024) {
-                // showToast("File is too small");
-                // console.log(
-                //     Object.keys(UploadStore).filter(key => typeof UploadStore[key] === "function")
-                // );
-                // UploadStore.addFile(file);
-                sendGhostUploadMessage(SelectedChannelStore.getChannelId(), file.name, 0);
+                showToast("⚠️ WARNING: File Too Small!", Toasts.Type.MESSAGE);
+                sendBotMessage(SelectedChannelStore.getChannelId(), {
+                    embeds: [
+                        {
+                            title: "⚠️ WARNING: File Too Small!",
+                            description: "Please use Discord's regular file upload instead to save resources.",
+                            // @ts-expect-error
+                            color: 0xFFFF00,
+                            type: "rich"
+                        }
+                    ]
+                });
+
                 return;
             }
 
             if (file && file.size >= 10 * 1024 * 1024) {
                 const channelId = SelectedChannelStore.getChannelId();
-                await uploadFile(file, channelId);
+                const botMessage = sendBotMessage(channelId, {
+                    embeds: [
+                        {
+                            title: "📤  Uploading File... [0%]",
+                            description: "This might take a moment.",
+                            // @ts-expect-error
+                            color: 0x57F287,
+                            type: "rich"
+                        }
+                    ]
+                });
+                await uploadFile(file, channelId, botMessage);
             } else {
                 showToast("No file selected");
             }
@@ -245,8 +263,35 @@ export default definePlugin({
             ],
             execute: async (opts, cmdCtx) => {
                 const file = await resolveFile(opts, cmdCtx);
-                if (file) {
-                    await uploadFile(file, cmdCtx.channel.id);
+                if (file && file.size < 10 * 1024 * 1024) {
+                    showToast("⚠️ WARNING: File Too Small!", Toasts.Type.MESSAGE);
+                    sendBotMessage(SelectedChannelStore.getChannelId(), {
+                        embeds: [
+                            {
+                                title: "⚠️ WARNING: File Too Small!",
+                                description: "Please use Discord's regular file upload instead to save resources.",
+                                // @ts-expect-error
+                                color: 0xFFFF00,
+                                type: "rich"
+                            }
+                        ]
+                    });
+
+                    return;
+                } else if (file && file.size >= 10 * 1024 * 1024) {
+                    const channelId = cmdCtx.channel.id;
+                    const botMessage = sendBotMessage(channelId, {
+                        embeds: [
+                            {
+                                title: "📤  Uploading File...",
+                                description: "This might take a moment.",
+                                // @ts-expect-error
+                                color: 0x57F287,
+                                type: "rich"
+                            }
+                        ]
+                    });
+                    await uploadFile(file, channelId, botMessage);
                 } else {
                     sendBotMessage(cmdCtx.channel.id, { content: "No file specified!" });
                     UploadManager.clearAll(cmdCtx.channel.id, DraftType.SlashCommand);
