@@ -4,13 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ApplicationCommandInputType, ApplicationCommandOptionType, Argument, CommandContext, sendBotMessage } from "@api/Commands";
+import { ApplicationCommandInputType, ApplicationCommandOptionType, sendBotMessage } from "@api/Commands";
 import { NavContextMenuPatchCallback } from "@api/ContextMenu";
 import { definePluginSettings } from "@api/Settings";
 import { OpenExternalIcon } from "@components/Icons";
 import { Devs } from "@utils/constants";
 import { insertTextIntoChatInputBox, sendMessage } from "@utils/discord";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
+import { CommandArgument, CommandContext } from "@vencord/discord-types";
 import { findByPropsLazy } from "@webpack";
 import { DraftType, FluxDispatcher, Forms, Menu, PermissionsBits, PermissionStore, React, SelectedChannelStore, showToast, Switch, Toasts, UploadManager, UserStore } from "@webpack/common";
 
@@ -69,7 +70,7 @@ function sendTextToChat(text: string, channelId?: string) {
     }
 }
 
-async function resolveFile(options: Argument[], ctx: CommandContext): Promise<File | null> {
+async function resolveFile(options: CommandArgument[], ctx: CommandContext): Promise<File | null> {
     for (const opt of options) {
         if (opt.name === "file") {
             const upload = UploadStore.getUpload(ctx.channel.id, opt.name, DraftType.SlashCommand);
