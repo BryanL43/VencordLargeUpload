@@ -202,7 +202,7 @@ function triggerFileUpload() {
                 const botMessage = sendBotMessage(channelId, {
                     embeds: [
                         {
-                            title: "📤  Uploading File... [0%]",
+                            title: "📤  Uploading File...",
                             description: "This might take a moment.",
                             // @ts-expect-error
                             color: 0x57F287,
