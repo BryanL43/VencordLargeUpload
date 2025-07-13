@@ -6,10 +6,9 @@
 
 export interface MultipartUploadResponse {
     uploadId: string;
-    key: string;
+    fileKey: string;
     partSize: number;
     presignedUrls: { partNumber: number; url: string; }[];
-    embedUrl: string;
 }
 
 export interface PartUploadResult {
@@ -19,7 +18,7 @@ export interface PartUploadResult {
 
 export async function promptPresignedURL(
     _, url: string,
-    name: string,
+    fileName: string,
     fileSize: number,
     fileType: string
 ): Promise<MultipartUploadResponse> {
@@ -28,7 +27,7 @@ export async function promptPresignedURL(
             method: "POST",
             redirect: "follow",
             body: JSON.stringify({
-                "fileName": name,
+                "fileName": fileName,
                 "fileSize": fileSize,
                 "contentType": fileType
             })
@@ -70,6 +69,25 @@ async function uploadChunkToS3(
     return eTagHeader?.replaceAll('"', "") || "";
 }
 
+async function runWithConcurrencyLimit<T>(
+    tasks: (() => Promise<T>)[],
+    concurrency: number
+): Promise<T[]> {
+    const results: T[] = [];
+    let index = 0;
+
+    const workers = Array(concurrency).fill(null).map(async () => {
+        while (index < tasks.length) {
+            const currentIndex = index++;
+            const task = tasks[currentIndex];
+            results[currentIndex] = await task();
+        }
+    });
+
+    await Promise.all(workers);
+    return results;
+}
+
 export async function uploadFilePartsToCloud(
     _,
     arrayBuffer: ArrayBuffer,
@@ -79,21 +97,21 @@ export async function uploadFilePartsToCloud(
 ) {
     const buffer = Buffer.from(arrayBuffer);
 
-    const uploadPromises = presignedUrls.map(({ partNumber, url }) => {
-        const start = (partNumber - 1) * partSize;
-        const end = Math.min(start + partSize, buffer.length);
-        const chunk = buffer.subarray(start, end);
+    const tasks = presignedUrls.map(({ partNumber, url }) => {
+        return async () => {
+            const start = (partNumber - 1) * partSize;
+            const end = Math.min(start + partSize, buffer.length);
+            const chunk = buffer.subarray(start, end);
 
-        return uploadChunkToS3(url, chunk, contentType)
-            .then(eTag => {
-                return {
-                    PartNumber: partNumber,
-                    ETag: eTag
-                };
-            });
+            const eTag = await uploadChunkToS3(url, chunk, contentType);
+            return {
+                PartNumber: partNumber,
+                ETag: eTag
+            };
+        };
     });
 
-    const eTags = await Promise.all(uploadPromises);
+    const eTags = await runWithConcurrencyLimit(tasks, 20);
 
     return eTags;
 }
@@ -102,26 +120,28 @@ export async function completeUpload(
     _,
     url: string,
     uploadId: string,
-    key: string,
-    eTags: { PartNumber: number; ETag: string; }[]
+    fileKey: string,
+    eTags: { PartNumber: number; ETag: string; }[],
+    fileName: string,
+    fileSize: number,
+    fileType: string
 ) {
     try {
-        const completePayload = {
-            uploadId,
-            key,
-            parts: eTags
-        };
-
         const options: RequestInit = {
             method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(completePayload)
+            body: JSON.stringify({
+                "uploadId": uploadId,
+                "fileKey": fileKey,
+                "parts": eTags,
+                "fileName": fileName,
+                "fileSize": fileSize,
+                "contentType": fileType
+            })
         };
 
         const response = await fetch(url, options);
         const result = await response.json();
+        console.log(result);
         return result;
     } catch (error) {
         console.error("Error during fetch request:", error);

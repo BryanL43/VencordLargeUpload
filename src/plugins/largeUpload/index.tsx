@@ -12,7 +12,7 @@ import { Devs } from "@utils/constants";
 import { insertTextIntoChatInputBox, sendMessage } from "@utils/discord";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { findByPropsLazy } from "@webpack";
-import { DraftType, Forms, Menu, PermissionsBits, PermissionStore, React, SelectedChannelStore, showToast, Switch, Toasts, UploadManager } from "@webpack/common";
+import { DraftType, FluxDispatcher, Forms, Menu, PermissionsBits, PermissionStore, React, SelectedChannelStore, showToast, Switch, Toasts, UploadManager, UserStore } from "@webpack/common";
 
 const Native = VencordNative.pluginHelpers.LargeFileUpload as PluginNative<typeof import("./native")>;
 
@@ -88,7 +88,7 @@ async function uploadFile(file: File, channelId: string) {
         showToast("Uploading... This may take a moment.", Toasts.Type.MESSAGE);
 
         // Request presigned URLs and upload parameters from backend
-        const { uploadId, key, partSize, presignedUrls, embedUrl } =
+        const { uploadId, fileKey, partSize, presignedUrls } =
             await Native.promptPresignedURL(
                 "https://api.largeupload.cloud/generate-upload",
                 fileName,
@@ -111,12 +111,18 @@ async function uploadFile(file: File, channelId: string) {
         const completeUploadResponse = await Native.completeUpload(
             "https://api.largeupload.cloud/complete-upload",
             uploadId,
-            key,
-            eTags
+            fileKey,
+            eTags,
+            fileName,
+            fileSize,
+            fileType
         );
 
-        if (completeUploadResponse.message === "Success") {
-            setTimeout(() => sendTextToChat(`${embedUrl} `, channelId), 10);
+        console.log(completeUploadResponse);
+
+        // Send success message
+        if (completeUploadResponse !== undefined) {
+            setTimeout(() => sendTextToChat(`${completeUploadResponse.embedUrl} `, channelId), 10);
             showToast("Upload complete!", Toasts.Type.SUCCESS);
             UploadManager.clearAll(channelId, DraftType.SlashCommand);
         } else {
@@ -133,6 +139,36 @@ async function uploadFile(file: File, channelId: string) {
     }
 }
 
+function sendGhostUploadMessage(channelId, filename, progress) {
+    const currentUser = UserStore.getCurrentUser();
+
+    const fakeMessage = {
+        id: crypto.randomUUID(),
+        type: 0,
+        channel_id: channelId,
+        author: {
+            id: currentUser.id,
+            username: currentUser.username,
+            discriminator: currentUser.discriminator,
+            avatar: currentUser.avatar,
+            bot: false
+        },
+        content: "Hello", // leave empty if you only want custom content
+        timestamp: new Date(),
+        // customRenderedContent: createElement(
+        //     "div",
+        //     { style: { color: "orange" } },
+        //     `Uploading ${filename}... ${progress}%`
+        // )
+    };
+
+    FluxDispatcher.dispatch({
+        type: "MESSAGE_CREATE",
+        channelId,
+        message: fakeMessage
+    });
+}
+
 
 function triggerFileUpload() {
     const fileInput = document.createElement("input");
@@ -145,10 +181,11 @@ function triggerFileUpload() {
             const file = target.files[0];
             if (file.size < 10 * 1024 * 1024) {
                 // showToast("File is too small");
-                console.log(
-                    Object.keys(UploadStore).filter(key => typeof UploadStore[key] === "function")
-                );
-                UploadStore.addFile(file);
+                // console.log(
+                //     Object.keys(UploadStore).filter(key => typeof UploadStore[key] === "function")
+                // );
+                // UploadStore.addFile(file);
+                sendGhostUploadMessage(SelectedChannelStore.getChannelId(), file.name, 0);
                 return;
             }
 
