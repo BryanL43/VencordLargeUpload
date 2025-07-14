@@ -109,7 +109,6 @@ async function uploadFile(file: File, channelId: string, botMessage: Message) {
         const { uploadId, fileKey, partSize, presignedUrls } =
             await Native.promptPresignedURL(
                 "https://api.largeupload.cloud/generate-upload",
-                fileName,
                 fileSize,
                 fileType
             );
