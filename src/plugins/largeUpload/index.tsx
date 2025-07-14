@@ -241,6 +241,11 @@ function triggerFileUpload() {
         const target = event.target as HTMLInputElement;
         if (target && target.files && target.files.length > 0) {
             const file = target.files[0];
+            if (!file) {
+                showToast("No file selected");
+                return;
+            }
+
             if (file.size < 10 * 1024 * 1024) {
                 showToast("⚠️ WARNING: File Too Small!", Toasts.Type.MESSAGE);
                 sendBotMessage(SelectedChannelStore.getChannelId(), {
@@ -254,27 +259,38 @@ function triggerFileUpload() {
                         }
                     ]
                 });
-
                 return;
             }
 
-            if (file && file.size >= 10 * 1024 * 1024) {
-                const channelId = SelectedChannelStore.getChannelId();
-                const botMessage = sendBotMessage(channelId, {
+            if (file.size > 2 * 1024 * 1024 * 1024) {
+                showToast("⚠️ WARNING: File Too Large!", Toasts.Type.MESSAGE);
+                sendBotMessage(SelectedChannelStore.getChannelId(), {
                     embeds: [
                         {
-                            title: "📤  Uploading File...",
-                            description: "This might take a moment.",
+                            title: "⚠️ WARNING: File Too Large!",
+                            description: "The limit is 2GB file to save resources.",
                             // @ts-expect-error
-                            color: 0x57F287,
+                            color: 0xFFFF00,
                             type: "rich"
                         }
                     ]
                 });
-                await uploadFile(file, channelId, botMessage);
-            } else {
-                showToast("No file selected");
+                return;
             }
+
+            const channelId = SelectedChannelStore.getChannelId();
+            const botMessage = sendBotMessage(channelId, {
+                embeds: [
+                    {
+                        title: "📤  Uploading File...",
+                        description: "This might take a moment.",
+                        // @ts-expect-error
+                        color: 0x57F287,
+                        type: "rich"
+                    }
+                ]
+            });
+            await uploadFile(file, channelId, botMessage);
         }
     };
 
@@ -302,7 +318,7 @@ const ctxMenuPatch: NavContextMenuPatchCallback = (children, props) => {
 
 export default definePlugin({
     name: "LargeFileUpload",
-    description: "Bypass Discord's upload limit by uploading files using the 'Upload a Big File' button or /fileupload and they'll get uploaded as links into chat via file uploaders.",
+    description: "Bypass Discord's upload limit by uploading files using the 'Upload a Big File' button or /fileupload and they'll get uploaded as links into chat via file uploaders. The file upload size is limited to the range of 10MB to 2GB for resource efficiency.",
     authors: [Devs.bryan],
     settings,
     dependencies: ["CommandsAPI"],
@@ -323,10 +339,18 @@ export default definePlugin({
                 },
             ],
             execute: async (opts, cmdCtx) => {
+                const channelId = cmdCtx.channel.id;
                 const file = await resolveFile(opts, cmdCtx);
-                if (file && file.size < 10 * 1024 * 1024) {
+                if (!file) {
+                    showToast("No file specified");
+                    sendBotMessage(channelId, { content: "No file specified!" });
+                    UploadManager.clearAll(channelId, DraftType.SlashCommand);
+                    return;
+                }
+
+                if (file.size < 10 * 1024 * 1024) {
                     showToast("⚠️ WARNING: File Too Small!", Toasts.Type.MESSAGE);
-                    sendBotMessage(SelectedChannelStore.getChannelId(), {
+                    sendBotMessage(channelId, {
                         embeds: [
                             {
                                 title: "⚠️ WARNING: File Too Small!",
@@ -337,26 +361,38 @@ export default definePlugin({
                             }
                         ]
                     });
-
                     return;
-                } else if (file && file.size >= 10 * 1024 * 1024) {
-                    const channelId = cmdCtx.channel.id;
-                    const botMessage = sendBotMessage(channelId, {
+                }
+
+                if (file.size > 2 * 1024 * 1024 * 1024) {
+                    showToast("⚠️ WARNING: File Too Large!", Toasts.Type.MESSAGE);
+                    sendBotMessage(channelId, {
                         embeds: [
                             {
-                                title: "📤  Uploading File...",
-                                description: "This might take a moment.",
+                                title: "⚠️ WARNING: File Too Large!",
+                                description: "The limit is 2GB file to save resources.",
                                 // @ts-expect-error
-                                color: 0x57F287,
+                                color: 0xFFFF00,
                                 type: "rich"
                             }
                         ]
                     });
-                    await uploadFile(file, channelId, botMessage);
-                } else {
-                    sendBotMessage(cmdCtx.channel.id, { content: "No file specified!" });
-                    UploadManager.clearAll(cmdCtx.channel.id, DraftType.SlashCommand);
+                    return;
                 }
+
+                const botMessage = sendBotMessage(channelId, {
+                    embeds: [
+                        {
+                            title: "📤  Uploading File...",
+                            description: "This might take a moment.",
+                            // @ts-expect-error
+                            color: 0x57F287,
+                            type: "rich"
+                        }
+                    ]
+                });
+
+                await uploadFile(file, channelId, botMessage);
             },
         },
     ],
