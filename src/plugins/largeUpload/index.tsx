@@ -165,7 +165,7 @@ async function uploadFile(file: File, channelId: string, botMessage: Message) {
         });
 
         // Upload 20 parts concurrently if the file is less than 1GB, or 10 parts otherwise
-        const eTags = await runWithConcurrencyLimit(tasks, fileSize < 1000 * 1024 * 1024 ? 20 : 10);
+        const eTags = await runWithConcurrencyLimit(tasks, fileSize < 1 * 1024 * 1024 * 1024 ? 20 : 10);
 
         // Complete the upload (Lambda reassembles all uploaded parts)
         const completeUploadResponse = await Native.completeUpload(
