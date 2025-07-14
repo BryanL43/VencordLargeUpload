@@ -70,53 +70,6 @@ export async function uploadChunkToS3(
     return eTagHeader?.replaceAll('"', "") || "";
 }
 
-async function runWithConcurrencyLimit<T>(
-    tasks: (() => Promise<T>)[],
-    concurrency: number
-): Promise<T[]> {
-    const results: T[] = [];
-    let index = 0;
-
-    const workers = Array(concurrency).fill(null).map(async () => {
-        while (index < tasks.length) {
-            const currentIndex = index++;
-            const task = tasks[currentIndex];
-            results[currentIndex] = await task();
-        }
-    });
-
-    await Promise.all(workers);
-    return results;
-}
-
-// export async function uploadFilePartsToCloud(
-//     _,
-//     arrayBuffer: ArrayBuffer,
-//     presignedUrls: { partNumber: number; url: string; }[],
-//     contentType: string,
-//     partSize: number
-// ) {
-//     const buffer = Buffer.from(arrayBuffer);
-
-//     const tasks = presignedUrls.map(({ partNumber, url }) => {
-//         return async () => {
-//             const start = (partNumber - 1) * partSize;
-//             const end = Math.min(start + partSize, buffer.length);
-//             const chunk = buffer.subarray(start, end);
-
-//             const eTag = await uploadChunkToS3(url, chunk, contentType);
-//             return {
-//                 PartNumber: partNumber,
-//                 ETag: eTag
-//             };
-//         };
-//     });
-
-//     const eTags = await runWithConcurrencyLimit(tasks, 20);
-
-//     return eTags;
-// }
-
 export async function completeUpload(
     _,
     url: string,

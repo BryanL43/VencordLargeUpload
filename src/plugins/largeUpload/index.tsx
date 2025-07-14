@@ -114,32 +114,32 @@ async function uploadFile(file: File, channelId: string, botMessage: Message) {
                 fileType
             );
 
-        // Take the file's buffer first due to Native limitations (electron bypassing CSP)
-        // const arrayBuffer = await file.arrayBuffer();
-
         const totalParts = presignedUrls.length;
-
-        // const eTags: { PartNumber: number; ETag: string; }[] = [];
         let completedParts = 0;
 
+        // Concurrently upload sliced file buffers
         const tasks = presignedUrls.map(({ partNumber, url }) => {
             return async () => {
+                // Compute the buffer for the individual part
                 const start = (partNumber - 1) * partSize;
                 const end = Math.min(start + partSize, file.size);
 
                 const blobSlice = file.slice(start, end);
                 const chunkBuffer = await blobSlice.arrayBuffer();
 
+                // Upload the part and acquire its eTag
                 const eTag = await Native.uploadChunkToS3(
                     url,
                     chunkBuffer,
                     fileType
                 );
 
+                // Update the progress bar
                 completedParts++;
                 const percent = Math.round((completedParts / totalParts) * 100);
                 const progressBar = `[${"█".repeat(percent / 10)}${"-".repeat(10 - percent / 10)}]`;
 
+                // Update the progress bar embed message
                 FluxDispatcher.dispatch({
                     type: "MESSAGE_UPDATE",
                     channelId,
@@ -164,45 +164,8 @@ async function uploadFile(file: File, channelId: string, botMessage: Message) {
             };
         });
 
-        const eTags = await runWithConcurrencyLimit(tasks, 20);
-
-        // for (const { partNumber, url } of presignedUrls) {
-        //     const start = (partNumber - 1) * partSize;
-        //     const end = Math.min(start + partSize, file.size);
-
-        //     const blobSlice = file.slice(start, end);
-        //     const chunkBuffer = await blobSlice.arrayBuffer();
-
-        //     eTags.push({ PartNumber: partNumber, ETag: await Native.uploadChunkToS3(url, chunkBuffer, fileType) });
-
-        //     const percent = Math.round((partNumber / totalParts) * 100);
-        //     const progressBar = `[${"█".repeat(percent / 10)}${"-".repeat(10 - percent / 10)}]`;
-
-        //     FluxDispatcher.dispatch({
-        //         type: "MESSAGE_UPDATE",
-        //         channelId,
-        //         message: {
-        //             id: botMessage.id,
-        //             channel_id: channelId,
-        //             embeds: [
-        //                 {
-        //                     title: `📤 Uploading File... [${percent}%]`,
-        //                     description: `Progress: ${progressBar} ${percent}%`,
-        //                     color: 0x57F287,
-        //                     type: "rich"
-        //                 }
-        //             ]
-        //         }
-        //     });
-        // }
-
-        // Upload the individual parts to their respective presigned URLs
-        // const eTags = await Native.uploadFilePartsToCloud(
-        //     arrayBuffer,
-        //     presignedUrls,
-        //     file.type,
-        //     partSize
-        // );
+        // Upload 20 parts concurrently if the file is less than 1GB, or 10 parts otherwise
+        const eTags = await runWithConcurrencyLimit(tasks, fileSize < 1000 * 1024 * 1024 ? 20 : 10);
 
         // Complete the upload (Lambda reassembles all uploaded parts)
         const completeUploadResponse = await Native.completeUpload(
