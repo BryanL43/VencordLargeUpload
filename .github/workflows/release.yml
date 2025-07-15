@@ -6,7 +6,7 @@ on:
         branches:
         - main
     schedule:
-        - cron: '0 9 * * *' # Ensure that it runs 1 hr after latest upstream sync
+        - cron: '15 8 * * *' # Ensure that it runs 15 min after latest upstream sync
 
 jobs:
     build:
