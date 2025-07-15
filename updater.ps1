@@ -14,12 +14,6 @@ try {
     }
     Expand-Archive -LiteralPath $DownloadPath -DestinationPath $ExtractPath -Force
 
-    # Run VencordInstallerCli.exe
-    $CLI = Join-Path $env:APPDATA "Vencord\VencordInstallerCli.exe"
-    if (Test-Path $CLI) {
-        Start-Process $CLI -ArgumentList "--install" -Wait
-    }
-
     # Delete the downloaded dist.zip
     if (Test-Path $DownloadPath) {
         Remove-Item $DownloadPath -Force
