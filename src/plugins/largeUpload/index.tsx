@@ -180,7 +180,7 @@ async function uploadFile(file: File, channelId: string, botMessage: Message) {
         // Send success message
         if (completeUploadResponse !== undefined) {
             setTimeout(() => sendTextToChat(`${completeUploadResponse.embedUrl} `, channelId), 10);
-            showToast("SUCCESS: File Upload Complete!", Toasts.Type.SUCCESS);
+            showToast("SUCCESS: File Upload Completed!", Toasts.Type.SUCCESS);
             FluxDispatcher.dispatch({
                 type: "MESSAGE_DELETE",
                 channelId,
