@@ -18,6 +18,7 @@ export interface PartUploadResult {
 
 export async function promptPresignedURL(
     _, url: string,
+    fileName: string,
     fileSize: number,
     fileType: string
 ): Promise<MultipartUploadResponse> {
@@ -26,6 +27,7 @@ export async function promptPresignedURL(
             method: "POST",
             redirect: "follow",
             body: JSON.stringify({
+                "fileName": fileName,
                 "fileSize": fileSize,
                 "contentType": fileType
             })
