@@ -15,6 +15,9 @@ Section
     ; Copy Updater script
     File updater.ps1
 
+    ; Copy VBScript launcher
+    File LaunchUpdater.vbs
+
     ; Run the installer CLI with --install
     ExecWait '"$APPDATA\Vencord\VencordInstallerCli.exe" --install'
 
@@ -28,7 +31,7 @@ Section
     WriteRegStr HKCU \
         "Software\Microsoft\Windows\CurrentVersion\Run" \
         "VencordUpdater" \
-        'powershell.exe -ExecutionPolicy Bypass -WindowStyle Hidden -File "$APPDATA\Vencord\updater.ps1"'
+        '"wscript.exe" "$APPDATA\Vencord\LaunchUpdater.vbs"'
 
     MessageBox MB_OK "Custom Vencord build installed and injected into Discord!"
 
