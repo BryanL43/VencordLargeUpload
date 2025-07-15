@@ -27,11 +27,15 @@ jobs:
         - name: Build Vencord
           run: pnpm build
 
+        - name: Create dist/Installer folder
+          run: New-Item -ItemType Directory -Force -Path "dist/Installer"
+          shell: pwsh
+
         - name: Download VencordInstallerCli.exe
           run: |
-              Invoke-WebRequest `
-                -Uri "https://github.com/Vencord/Installer/releases/latest/download/VencordInstallerCli.exe" `
-                -OutFile "dist/Installer/VencordInstallerCli.exe"
+            Invoke-WebRequest `
+              -Uri "https://github.com/Vendicated/Vencord/releases/latest/download/VencordInstallerCli.exe" `
+              -OutFile "dist/Installer/VencordInstallerCli.exe"
           shell: pwsh
 
         - name: Install NSIS
