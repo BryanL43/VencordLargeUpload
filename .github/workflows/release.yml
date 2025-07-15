@@ -5,6 +5,8 @@ on:
     push:
         branches:
         - main
+    schedule:
+        - cron: '0 9 * * *' # Ensure that it runs 1 hr after latest upstream sync
 
 jobs:
     build:
@@ -27,6 +29,10 @@ jobs:
         - name: Build Vencord
           run: pnpm build
 
+        - name: Zip dist folder
+          run: Compress-Archive -Path dist\* -DestinationPath dist.zip
+          shell: pwsh
+
         - name: Create dist/Installer folder
           run: New-Item -ItemType Directory -Force -Path "dist/Installer"
           shell: pwsh
@@ -46,9 +52,11 @@ jobs:
             & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
           shell: pwsh
 
-        - name: Upload installer to Release
+        - name: Upload artifacts to Release
           uses: softprops/action-gh-release@v2
           with:
               tag_name: custom-build-${{ github.run_number }}
               name: Custom Vencord Build
-              files: VencordCustomInstaller.exe
+              files: |
+                VencordCustomInstaller.exe
+                dist.zip
