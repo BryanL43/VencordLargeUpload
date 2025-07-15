@@ -281,7 +281,7 @@ function triggerFileUpload() {
             const botMessage = sendBotMessage(channelId, {
                 embeds: [
                     {
-                        title: "📤  Uploading File...",
+                        title: "📤  Uploading Your File...",
                         description: "This might take a moment.",
                         // @ts-expect-error
                         color: 0x57F287,
@@ -382,7 +382,7 @@ export default definePlugin({
                 const botMessage = sendBotMessage(channelId, {
                     embeds: [
                         {
-                            title: "📤  Uploading File...",
+                            title: "📤  Uploading Your File...",
                             description: "This might take a moment.",
                             // @ts-expect-error
                             color: 0x57F287,
