@@ -1,0 +1,51 @@
+name: Build Custom Vencord Installer
+
+on:
+    workflow_dispatch:
+    push:
+        branches:
+        - main
+
+jobs:
+    build:
+        runs-on: windows-latest
+
+        steps:
+        - uses: actions/checkout@v4
+
+        - uses: pnpm/action-setup@v3
+
+        - name: Use Node.js 20
+          uses: actions/setup-node@v4
+          with:
+              node-version: 20
+              cache: "pnpm"
+
+        - name: Install dependencies
+          run: pnpm install --frozen-lockfile
+
+        - name: Build Vencord
+          run: pnpm build
+
+        - name: Download VencordInstallerCli.exe
+          run: |
+              Invoke-WebRequest `
+                -Uri "https://github.com/Vencord/Installer/releases/latest/download/VencordInstallerCli.exe" `
+                -OutFile "dist/Installer/VencordInstallerCli.exe"
+          shell: pwsh
+
+        - name: Install NSIS
+          run: choco install nsis -y
+          shell: pwsh
+
+        - name: Compile NSIS Installer
+          run: |
+            & "C:\Program Files (x86)\NSIS\makensis.exe" installer.nsi
+          shell: pwsh
+
+        - name: Upload installer to Release
+          uses: softprops/action-gh-release@v2
+          with:
+              tag_name: custom-build-${{ github.run_number }}
+              name: Custom Vencord Build
+              files: VencordCustomInstaller.exe
