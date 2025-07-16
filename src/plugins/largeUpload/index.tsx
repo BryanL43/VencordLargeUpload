@@ -148,7 +148,7 @@ async function uploadFile(file: File, channelId: string, botMessage: Message) {
                         channel_id: channelId,
                         embeds: [
                             {
-                                title: `📤 Uploading File... [${percent}%]`,
+                                title: `📤  Uploading Your File... [${percent}%]`,
                                 description: `Progress: ${progressBar} ${percent}%`,
                                 color: 0x57F287,
                                 type: "rich"
