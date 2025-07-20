@@ -60,3 +60,21 @@ jobs:
               files: |
                 VencordCustomInstaller.exe
                 dist.zip
+
+        - name: Delete previous releases
+          env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          run: |
+            gh auth login --with-token <<< "${GH_TOKEN}"
+
+            # Get the latest release tag we just created
+            latest_tag="custom-build-${{ github.run_number }}"
+
+            # List all releases
+            gh release list --limit 100 | while read -r line; do
+              tag=$(echo "$line" | awk '{print $1}')
+              if [[ "$tag" != "$latest_tag" ]]; then
+                echo "Deleting old release: $tag"
+                gh release delete "$tag" --yes
+              fi
+            done
