@@ -318,7 +318,7 @@ const ctxMenuPatch: NavContextMenuPatchCallback = (children, props) => {
 
 export default definePlugin({
     name: "LargeFileUpload",
-    description: "Bypass Discord's upload limit by uploading files using the 'Upload a Big File' button or /fileupload and they'll get uploaded as links into chat via file uploaders. The file upload size is limited to the range of 10MB to 2GB for resource efficiency.",
+    description: "Bypass Discord's upload limit by uploading files using the 'Upload a Large File' button or /fileupload and they'll get uploaded as links into the chat. The file upload size is limited to the range of 10MB to 2GB for resource efficiency.",
     authors: [Devs.bryan],
     settings,
     dependencies: ["CommandsAPI"],

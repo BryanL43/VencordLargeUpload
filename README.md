@@ -1,3 +1,20 @@
+# Vencord Large Upload Plugin
+A plugin wrapper for Vencord (credits/original repository information remains intact below). This plugin creates a new media upload button and chat command that reroute traffics to my own server and allows files ranging from 10MB to 2GB in size. The uploaded media will appear as links in the chat once the upload is complete (⚠️ please be aware that some Discord servers may restrict link sharing). Videos will show as embeds, but larger ones might not load as expected.
+
+<table align="center" border="0" width="100%">
+    <tr>
+        <td><img src="https://www.largeupload.cloud/static/large-upload-button.png" style="width:100%; max-width:300px; height:auto;"></td>
+        <td><img src="https://www.largeupload.cloud/static/file-upload-command.png" style="width:100%; max-width:500px; height:auto;"></td>
+    </tr>
+</table>
+
+## Custom Vencord Plugin Installation
+[![Download Installer](https://img.shields.io/badge/Download-Installer-purple?style=for-the-badge)](https://github.com/BryanL43/VencordLargeUpload/releases/latest/download/VencordCustomInstaller.exe)
+
+Download the `VencordCustomInstaller.exe` and follow the CLI prompts to set it up. It's currently compatible only with the Windows version of Discord.
+
+**Note:** The installer adds an auto-updater that keeps Vencord up to date while reapplying the custom modifications required for this plugin, since its installation breaks the built-in updater.
+
 # Vencord
 
 ![](https://img.shields.io/github/package-json/v/Vendicated/Vencord?style=for-the-badge&logo=github&logoColor=d3869b&label=&color=1d2021&labelColor=282828)
