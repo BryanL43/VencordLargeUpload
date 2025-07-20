@@ -62,19 +62,18 @@ jobs:
                 dist.zip
 
         - name: Delete previous releases
+          shell: pwsh
           env:
             GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           run: |
-            gh auth login --with-token <<< "${GH_TOKEN}"
+            gh auth setup-git
+            $releases = gh release list --limit 100
+            $latestTag = "custom-build-${{ github.run_number }}"
 
-            # Get the latest release tag we just created
-            latest_tag="custom-build-${{ github.run_number }}"
-
-            # List all releases
-            gh release list --limit 100 | while read -r line; do
-              tag=$(echo "$line" | awk '{print $1}')
-              if [[ "$tag" != "$latest_tag" ]]; then
-                echo "Deleting old release: $tag"
-                gh release delete "$tag" --yes
-              fi
-            done
+            foreach ($line in $releases -split "`n") {
+              $tag = $line.Split(" ")[0]
+              if ($tag -ne $latestTag) {
+                Write-Host "Deleting old release: $tag"
+                gh release delete $tag --yes
+              }
+            }
