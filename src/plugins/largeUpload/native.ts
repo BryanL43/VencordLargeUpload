@@ -95,7 +95,30 @@ export async function completeUpload(
 
         const response = await fetch(url, options);
         const result = await response.json();
-        console.log(result);
+        return result;
+    } catch (error) {
+        console.error("Error during fetch request:", error);
+        throw error;
+    }
+}
+
+export async function cancelUpload(
+    _,
+    url: string,
+    uploadId: string,
+    fileKey: string
+) {
+    try {
+        const options: RequestInit = {
+            method: "POST",
+            body: JSON.stringify({
+                "uploadId": uploadId,
+                "fileKey": fileKey
+            })
+        };
+
+        const response = await fetch(url, options);
+        const result = await response.json();
         return result;
     } catch (error) {
         console.error("Error during fetch request:", error);

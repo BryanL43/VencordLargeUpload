@@ -3,8 +3,8 @@ A plugin wrapper for Vencord (credits/original repository information remains in
 
 <table align="center" border="0" width="100%">
     <tr>
-        <td><img src="https://www.largeupload.cloud/static/large-upload-button.png" style="width:100%; max-width:300px; height:auto;"></td>
-        <td><img src="https://www.largeupload.cloud/static/file-upload-command.png" style="width:100%; max-width:500px; height:auto;"></td>
+        <td><img src="https://www.largeupload.cloud/static/large-upload-button.png" style="height: 250px; width: auto;"></td>
+        <td><img src="https://www.largeupload.cloud/static/file-upload-command.png" style="height: 250px; width: auto;"></td>
     </tr>
 </table>
 
