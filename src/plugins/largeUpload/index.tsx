@@ -291,6 +291,7 @@ async function dispatchCancel(
     if (controller) {
         controller.abort();
         cancelControllers.delete(cancelId);
+        Native.deleteCancelController(cancelId);
     }
 
     // Update bot message to cancelling state
@@ -338,6 +339,8 @@ async function dispatchCancel(
             ]
         }
     });
+
+    cancelAbort.delete(cancelId);
 }
 
 async function runWithConcurrencyLimit<T>(
@@ -460,15 +463,20 @@ async function uploadFile(
             };
         });
 
-        let taskResults: PromiseSettledResult<{ PartNumber: number, ETag: string }>[] = [];
+        let taskResults: PromiseSettledResult<{ PartNumber: number, ETag: string; }>[] = [];
 
+        // Upload 20 parts concurrently if the file is less than 1GB, or 10 parts otherwise
         const taskPromise = runWithConcurrencyLimit(tasks, fileSize < 1 * 1024 * 1024 * 1024 ? 20 : 10)
             .then(results => {
-                taskResults = results as PromiseSettledResult<{ PartNumber: number; ETag: string }>[];
+                taskResults = results as PromiseSettledResult<{ PartNumber: number; ETag: string; }>[];
+            })
+            .finally(() => {
+                clearInterval(interval);
             });
 
+        let interval: NodeJS.Timeout;
         const cancelWatcher = new Promise<void>(resolve => {
-            const interval = setInterval(() => {
+            interval = setInterval(() => {
                 if (cancelAbort.get(cancelId)) {
                     clearInterval(interval);
                     dispatchCancel(channelId, botMessage.id, observerRefs, cancelId, uploadId, fileKey);
@@ -485,7 +493,9 @@ async function uploadFile(
         // Filter successful uploads
         const eTags = taskResults
             .filter(res => res.status === "fulfilled")
-            .map(res => (res as PromiseFulfilledResult<{ PartNumber: number, ETag: string }>).value);
+            .map(res => (res as PromiseFulfilledResult<{ PartNumber: number, ETag: string; }>).value);
+
+        taskResults = [];
 
         // Complete the upload (Lambda reassembles all uploaded parts)
         const completeUploadResponse = await Native.completeUpload(
@@ -726,7 +736,8 @@ export default definePlugin({
                     return;
                 }
 
-                const botMessage = sendBotMessage(channelId, {
+                const cancelId = `cancel_upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const botMessage = await sendBotMessage(channelId, {
                     embeds: [
                         {
                             title: "📤  Uploading Your File...",
@@ -738,13 +749,22 @@ export default definePlugin({
                     ]
                 });
 
-                // TODO: IMPLEMENT
-                // await uploadFile(file, channelId, botMessage, "", {
-                //     current: new MutationObserver(() => { }),
-                //     persistCleanup: function (): void {
-                //         throw new Error("Function not implemented.");
-                //     }
-                // });
+                // Set initial state of abortion
+                cancelAbort.set(cancelId, false);
+
+                // Latch a persistent cancel button to the bot message
+                const observerRefs: ObserverRefs = {
+                    current: waitForMessageAccessories(botMessage.id, () => {
+                        cancelAbort.set(cancelId, true);
+                        console.log("Upload cancel request for:", botMessage.id);
+                    }),
+                    persistCleanup: watchAndPersistButton(botMessage.id)
+                };
+
+                // Launch upload as a seperate thread to prevent UI blocking
+                setTimeout(() => {
+                    uploadFile(file, channelId, botMessage, cancelId, observerRefs);
+                }, 0);
             },
         },
     ],

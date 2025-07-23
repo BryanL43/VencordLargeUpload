@@ -48,6 +48,10 @@ export function registerCancelController(_, cancelId: string, controller: AbortC
     cancelControllers.set(cancelId, controller);
 }
 
+export function deleteCancelController(_, cancelId: string) {
+    cancelControllers.delete(cancelId);
+}
+
 export async function uploadChunkToS3(
     _,
     url: string,
