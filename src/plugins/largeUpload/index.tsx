@@ -19,7 +19,8 @@ const Native = VencordNative.pluginHelpers.LargeFileUpload as PluginNative<typeo
 
 const UploadStore = findByPropsLazy("getUploads");
 const OptionClasses = findByPropsLazy("optionName", "optionIcon", "optionLabel");
-const cancelOptions = new Map<string, { aborted: boolean; }>();
+const cancelAbort = new Map<string, boolean>();
+const cancelControllers = new Map<string, AbortController>();
 
 interface ObserverRefs {
     current: MutationObserver;
@@ -272,6 +273,7 @@ async function dispatchCancel(
     channelId: string,
     botMessageId: string,
     observerRef: ObserverRefs,
+    cancelId,
     uploadId?: string,
     fileKey?: string
 ) {
@@ -283,6 +285,13 @@ async function dispatchCancel(
     // Force remove the cancel button
     const button = document.getElementById(`cancel-upload-${botMessageId}`);
     button?.remove();
+
+    // Abort the controller
+    const controller = cancelControllers.get(cancelId);
+    if (controller) {
+        controller.abort();
+        cancelControllers.delete(cancelId);
+    }
 
     // Update bot message to cancelling state
     FluxDispatcher.dispatch({
@@ -334,15 +343,20 @@ async function dispatchCancel(
 async function runWithConcurrencyLimit<T>(
     tasks: (() => Promise<T>)[],
     concurrency: number
-): Promise<T[]> {
-    const results: T[] = [];
+): Promise<PromiseSettledResult<T>[]> {
+    const results: PromiseSettledResult<T>[] = [];
     let index = 0;
 
     const workers = Array(concurrency).fill(null).map(async () => {
         while (index < tasks.length) {
             const currentIndex = index++;
             const task = tasks[currentIndex];
-            results[currentIndex] = await task();
+            try {
+                const value = await task();
+                results[currentIndex] = { status: "fulfilled", value };
+            } catch (reason) {
+                results[currentIndex] = { status: "rejected", reason };
+            }
         }
     });
 
@@ -359,8 +373,8 @@ async function uploadFile(
 ) {
     try {
         // Precheck if upload was cancelled early
-        if (cancelOptions.get(cancelId)?.aborted) {
-            dispatchCancel(channelId, botMessage.id, observerRefs);
+        if (cancelAbort.get(cancelId)) {
+            dispatchCancel(channelId, botMessage.id, observerRefs, cancelId);
             return;
         }
 
@@ -378,49 +392,50 @@ async function uploadFile(
             );
 
         // Cancel check
-        if (cancelOptions.get(cancelId)?.aborted) {
-            dispatchCancel(channelId, botMessage.id, observerRefs, uploadId, fileKey);
+        if (cancelAbort.get(cancelId)) {
+            dispatchCancel(channelId, botMessage.id, observerRefs, cancelId, uploadId, fileKey);
             return;
         }
 
         const totalParts = presignedUrls.length;
         let completedParts = 0;
 
+        const controller = new AbortController();
+        cancelControllers.set(cancelId, controller);
+        Native.registerCancelController(cancelId, controller);
+
         // Concurrently upload sliced file buffers; multiple cancel check points to avoid race conditions
         const tasks = presignedUrls.map(({ partNumber, url }) => {
             return async () => {
-                if (cancelOptions.get(cancelId)?.aborted) {
-                    throw new Error("Upload canceled before task started");
+                if (cancelAbort.get(cancelId)) {
+                    return;
                 }
 
-                // Compute the buffer for the individual part
                 const start = (partNumber - 1) * partSize;
                 const end = Math.min(start + partSize, file.size);
-
                 const blobSlice = file.slice(start, end);
                 const chunkBuffer = await blobSlice.arrayBuffer();
 
-                if (cancelOptions.get(cancelId)?.aborted) {
-                    throw new Error("Upload canceled mid-task after buffer load");
+                if (cancelAbort.get(cancelId)) {
+                    return;
                 }
 
                 // Upload the part and acquire its eTag
                 const eTag = await Native.uploadChunkToS3(
                     url,
                     chunkBuffer,
-                    fileType
+                    fileType,
+                    cancelId
                 );
 
-                if (cancelOptions.get(cancelId)?.aborted) {
-                    throw new Error("Upload canceled mid-task after upload");
+                if (cancelAbort.get(cancelId)) {
+                    return;
                 }
 
-                // Update the progress bar
                 completedParts++;
                 const percent = Math.round((completedParts / totalParts) * 100);
                 const progressBar = `[${"█".repeat(percent / 10)}${"-".repeat(10 - percent / 10)}]`;
 
-                // Update the progress bar embed message
                 FluxDispatcher.dispatch({
                     type: "MESSAGE_UPDATE",
                     channelId,
@@ -445,31 +460,32 @@ async function uploadFile(
             };
         });
 
-        let eTags: { PartNumber: number, ETag: string; }[] = [];
+        let taskResults: PromiseSettledResult<{ PartNumber: number, ETag: string }>[] = [];
 
-        try {
-            // Create limited concurrent task runners
-            const taskRunners = await runWithConcurrencyLimit(
-                tasks,
-                fileSize < 1 * 1024 * 1024 * 1024 ? 20 : 10
-            );
+        const taskPromise = runWithConcurrencyLimit(tasks, fileSize < 1 * 1024 * 1024 * 1024 ? 20 : 10)
+            .then(results => {
+                taskResults = results as PromiseSettledResult<{ PartNumber: number; ETag: string }>[];
+            });
 
-            // Wait for all to settle (fulfilled or rejected)
-            const results = await Promise.allSettled(taskRunners);
+        const cancelWatcher = new Promise<void>(resolve => {
+            const interval = setInterval(() => {
+                if (cancelAbort.get(cancelId)) {
+                    clearInterval(interval);
+                    dispatchCancel(channelId, botMessage.id, observerRefs, cancelId, uploadId, fileKey);
+                    resolve();
+                }
+            }, 100);
+        });
 
-            // Extract successful uploads
-            eTags = results
-                .filter(result => result.status === "fulfilled")
-                .map(result => (result as PromiseFulfilledResult<{ PartNumber: number; ETag: string; }>).value);
+        await Promise.race([taskPromise, cancelWatcher]);
 
-        } catch (error) {
-            if (cancelOptions.get(cancelId)?.aborted) {
-                dispatchCancel(channelId, botMessage.id, observerRefs, uploadId, fileKey);
-                return;
-            } else {
-                throw error; // Larger try-catch will handle this
-            }
-        }
+        // Fallback check, it should've been cancelled already
+        if (cancelAbort.get(cancelId)) return;
+
+        // Filter successful uploads
+        const eTags = taskResults
+            .filter(res => res.status === "fulfilled")
+            .map(res => (res as PromiseFulfilledResult<{ PartNumber: number, ETag: string }>).value);
 
         // Complete the upload (Lambda reassembles all uploaded parts)
         const completeUploadResponse = await Native.completeUpload(
@@ -481,12 +497,6 @@ async function uploadFile(
             fileSize,
             fileType
         );
-
-        // Cancel check
-        if (cancelOptions.get(cancelId)?.aborted) {
-            dispatchCancel(channelId, botMessage.id, observerRefs, uploadId, fileKey);
-            return;
-        }
 
         // Send success message
         if (completeUploadResponse.embedUrl) {
@@ -615,12 +625,12 @@ function triggerFileUpload() {
             });
 
             // Set initial state of abortion
-            cancelOptions.set(cancelId, { aborted: false });
+            cancelAbort.set(cancelId, false);
 
             // Latch a persistent cancel button to the bot message
             const observerRefs: ObserverRefs = {
                 current: waitForMessageAccessories(botMessage.id, () => {
-                    cancelOptions.get(cancelId)!.aborted = true;
+                    cancelAbort.set(cancelId, true);
                     console.log("Upload cancel request for:", botMessage.id);
                 }),
                 persistCleanup: watchAndPersistButton(botMessage.id)
@@ -729,12 +739,12 @@ export default definePlugin({
                 });
 
                 // TODO: IMPLEMENT
-                await uploadFile(file, channelId, botMessage, "", {
-                    current: new MutationObserver(() => { }),
-                    persistCleanup: function (): void {
-                        throw new Error("Function not implemented.");
-                    }
-                });
+                // await uploadFile(file, channelId, botMessage, "", {
+                //     current: new MutationObserver(() => { }),
+                //     persistCleanup: function (): void {
+                //         throw new Error("Function not implemented.");
+                //     }
+                // });
             },
         },
     ],
