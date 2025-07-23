@@ -3,17 +3,25 @@ A plugin wrapper for Vencord (credits/original repository information remains in
 
 <table align="center" border="0" width="100%">
     <tr>
-        <td><img src="https://www.largeupload.cloud/static/large-upload-button.png" style="width:100%; max-width:300px; height:auto;"></td>
-        <td><img src="https://www.largeupload.cloud/static/file-upload-command.png" style="width:100%; max-width:500px; height:auto;"></td>
+        <td><img src="https://www.largeupload.cloud/static/large-upload-button.png" style="height: 250px; width: auto;"></td>
+        <td><img src="https://www.largeupload.cloud/static/file-upload-command.png" style="height: 250px; width: auto;"></td>
     </tr>
 </table>
 
 ## Custom Vencord Plugin Installation
 [![Download Installer](https://img.shields.io/badge/Download-Installer-purple?style=for-the-badge)](https://github.com/BryanL43/VencordLargeUpload/releases/latest/download/VencordCustomInstaller.exe)
 
-Download the `VencordCustomInstaller.exe` and follow the CLI prompts to set it up. It's currently compatible only with the Windows version of Discord.
+Download the `VencordCustomInstaller.exe` and follow the CLI prompts to set it up. It's currently compatible only with the Windows version of Discord. The plugin is located under `User Settings > Vencord > Plugins > LargeFileUpload`.
 
 **Note:** The installer adds an auto-updater that keeps Vencord up to date while reapplying the custom modifications required for this plugin, since its installation breaks the built-in updater.
+
+## Plugin Additional Features
+<table align="center" border="0" width="100%">
+    <tr>
+        <td><img src="https://www.largeupload.cloud/static/plugin-settings.png" style="height: 210px; width: auto;"></td>
+        <td><img src="https://www.largeupload.cloud/static/uploading-img.png" style="height: 210px; width: auto;"></td>
+    </tr>
+</table>
 
 # Vencord
 

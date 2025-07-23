@@ -11,11 +11,6 @@ export interface MultipartUploadResponse {
     presignedUrls: { partNumber: number; url: string; }[];
 }
 
-export interface PartUploadResult {
-    status: number;
-    eTag: string | null;
-}
-
 export async function promptPresignedURL(
     _, url: string,
     fileName: string,
@@ -47,19 +42,33 @@ export async function promptPresignedURL(
     }
 }
 
+// Inject a cancel controller into Native global scope
+const cancelControllers = new Map<string, AbortController>();
+export function registerCancelController(_, cancelId: string, controller: AbortController) {
+    cancelControllers.set(cancelId, controller);
+}
+
+export function deleteCancelController(_, cancelId: string) {
+    cancelControllers.delete(cancelId);
+}
+
 export async function uploadChunkToS3(
     _,
     url: string,
     chunk: ArrayBuffer,
-    contentType: string
+    contentType: string,
+    cancelId: string
 ) {
+    const controller = cancelControllers.get(cancelId);
+
     const res = await fetch(url, {
         method: "PUT",
         headers: {
             "Content-Type": contentType,
             "Content-Length": chunk.byteLength.toString()
         },
-        body: chunk
+        body: chunk,
+        signal: controller?.signal
     });
 
     if (!res.ok) {
@@ -95,7 +104,30 @@ export async function completeUpload(
 
         const response = await fetch(url, options);
         const result = await response.json();
-        console.log(result);
+        return result;
+    } catch (error) {
+        console.error("Error during fetch request:", error);
+        throw error;
+    }
+}
+
+export async function cancelUpload(
+    _,
+    url: string,
+    uploadId: string,
+    fileKey: string
+) {
+    try {
+        const options: RequestInit = {
+            method: "POST",
+            body: JSON.stringify({
+                "uploadId": uploadId,
+                "fileKey": fileKey
+            })
+        };
+
+        const response = await fetch(url, options);
+        const result = await response.json();
         return result;
     } catch (error) {
         console.error("Error during fetch request:", error);
