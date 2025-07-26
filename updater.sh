@@ -7,6 +7,7 @@ EXTRACT_PATH="$APPDATA/dist"
 ETAG_FILE="$APPDATA/etag.txt"
 
 mkdir -p "$EXTRACT_PATH"
+chmod u+rw "$ETAG_FILE"
 
 # Wait for internet connection
 while ! ping -c1 github.com &>/dev/null; do
