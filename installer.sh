@@ -46,9 +46,9 @@ curl -fsSL https://raw.githubusercontent.com/BryanL43/VencordLargeUpload/refs/he
 
 chmod +x "$UPDATER_PATH"
 
-if ! grep -Fxq "$UPDATER_CMD" ~/.profile; then
-    echo "$UPDATER_CMD" >> ~/.profile
-    echo "Updater script added to ~/.profile"
+if ! grep -Fq "$UPDATER_PATH" ~/.profile; then
+    printf "\n# Run Vencord updater at login\nbash \"%s\" &\n" "$UPDATER_PATH" >> ~/.profile
+    echo "Added updater to ~/.profile"
 fi
 
 echo "Custom Vencord build installed and injected into Discord!"
