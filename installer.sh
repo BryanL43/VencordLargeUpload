@@ -51,4 +51,7 @@ if ! grep -Fq "$UPDATER_PATH" ~/.profile; then
     echo "Added updater to ~/.profile"
 fi
 
+# Run the updater to mount plugin without requiring reboot
+bash "$UPDATER_PATH" &
+
 echo "Custom Vencord build installed and injected into Discord!"
