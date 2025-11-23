@@ -45,7 +45,7 @@ jobs:
       - name: Merge upstream changes
         if: env.merge_needed == 'true'
         run: |
-          git merge upstream/main
+          git merge upstream/main -X theirs --no-edit
 
       - name: Reapply custom Dev entry
         if: env.merge_needed == 'true'
