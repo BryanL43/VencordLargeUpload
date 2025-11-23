@@ -1,7 +1,0 @@
---- a/src/utils/constants.ts
-+++ b/src/utils/constants.ts
-@@ export const Devs = /* #__PURE__*/ Object.freeze({
-+    bryan: {
-+        name: "bryan.__",
-+        id: 384865971455918084n
-+    },

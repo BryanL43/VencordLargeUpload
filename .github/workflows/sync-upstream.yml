@@ -42,15 +42,39 @@ jobs:
             echo "merge_needed=false" >> $GITHUB_ENV
           fi
 
+      - name: Pre-resolve constants.ts by taking upstream version
+        if: env.merge_needed == 'true'
+        run: |
+          git checkout upstream/main -- src/utils/constants.ts
+
       - name: Merge upstream changes
         if: env.merge_needed == 'true'
         run: |
-          git merge upstream/main -X theirs --no-edit
+          git merge upstream/main --no-edit
 
-      - name: Reapply custom Dev entry
+      - name: Reinstate custom Dev entry
         if: env.merge_needed == 'true'
         run: |
-          git apply --allow-empty .github/patches/custom-dev.patch || true
+          FILE=src/utils/constants.ts
+
+          # Remove any previous copy of your entry
+          sed -i '/bryan:/,/}/d' "$FILE"
+
+          # Insert entry before the final closing "}" of the Devs object
+          # Steps:
+          # - Find the line of "satisfies Record<string, Dev>" which marks the end
+          # - Move one line up to the actual closing "}"
+          # - Insert entry and ensure preceding entry has a comma
+
+          # Add comma to last property if missing
+          sed -i '/^\s*}$/ { x; s/\n/,/; x }' "$FILE"
+
+          # Insert your entry before the final "}"
+          sed -i '/^\s*}$/ i\
+            bryan: {\
+                name: "bryan.__",\
+                id: 384865971455918084n\
+            },' "$FILE"
 
       - name: Commit custom Dev entry
         if: env.merge_needed == 'true'
