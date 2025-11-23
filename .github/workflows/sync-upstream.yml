@@ -42,10 +42,45 @@ jobs:
             echo "merge_needed=false" >> $GITHUB_ENV
           fi
 
+      - name: Pre-resolve constants.ts by taking upstream version
+        if: env.merge_needed == 'true'
+        run: |
+          git checkout upstream/main -- src/utils/constants.ts
+          git add src/utils/constants.ts
+          git commit -m "Pre-resolve constants.ts to match upstream" || true
+
       - name: Merge upstream changes
         if: env.merge_needed == 'true'
         run: |
-          git merge upstream/main
+          git merge upstream/main --no-edit
+
+      - name: Reinstate custom Dev entry
+        if: env.merge_needed == 'true'
+        run: |
+          FILE=src/utils/constants.ts
+
+          # Remove any previous copy of your entry
+          sed -i '/bryan:/,/}/d' "$FILE"
+
+          # Find the line BEFORE the line containing "satisfies Record"
+          RAW_END=$(grep -n "satisfies Record" "$FILE" | cut -d: -f1)
+          END_LINE=$((RAW_END - 1))
+
+          # Ensure the previous final entry ends with a comma
+          sed -i "${END_LINE}s/}$/},/" "$FILE"
+
+          # Reinstate custom dev entry
+          sed -i "${END_LINE}i\\
+              bryan: {\\
+                  name: \"bryan.__\",\\
+                  id: 384865971455918084n\\
+              }," "$FILE"
+
+      - name: Commit custom Dev entry
+        if: env.merge_needed == 'true'
+        run: |
+          git add src/utils/constants.ts
+          git commit -m "Reinsert custom Dev entry" || true
 
       - name: Set up authenticated push
         if: env.merge_needed == 'true'
