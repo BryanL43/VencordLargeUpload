@@ -47,6 +47,17 @@ jobs:
         run: |
           git merge upstream/main
 
+      - name: Reapply custom Dev entry
+        if: env.merge_needed == 'true'
+        run: |
+          git apply --allow-empty .github/patches/custom-dev.patch || true
+
+      - name: Commit custom Dev entry
+        if: env.merge_needed == 'true'
+        run: |
+          git add src/utils/constants.ts
+          git commit -m "Reapply custom Dev entry" || true
+
       - name: Set up authenticated push
         if: env.merge_needed == 'true'
         run: |
