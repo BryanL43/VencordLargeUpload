@@ -46,6 +46,7 @@ jobs:
         if: env.merge_needed == 'true'
         run: |
           git checkout upstream/main -- src/utils/constants.ts
+          git add src/utils/constants.ts
 
       - name: Merge upstream changes
         if: env.merge_needed == 'true'
