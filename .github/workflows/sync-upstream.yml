@@ -47,6 +47,7 @@ jobs:
         run: |
           git checkout upstream/main -- src/utils/constants.ts
           git add src/utils/constants.ts
+          git commit -m "Pre-resolve constants.ts to match upstream" || true
 
       - name: Merge upstream changes
         if: env.merge_needed == 'true'
@@ -79,7 +80,7 @@ jobs:
         if: env.merge_needed == 'true'
         run: |
           git add src/utils/constants.ts
-          git commit -m "Reapply custom Dev entry" || true
+          git commit -m "Reinsert custom Dev entry" || true
 
       - name: Set up authenticated push
         if: env.merge_needed == 'true'
