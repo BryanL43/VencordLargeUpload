@@ -13,7 +13,7 @@ import { insertTextIntoChatInputBox, sendMessage } from "@utils/discord";
 import definePlugin, { OptionType, PluginNative } from "@utils/types";
 import { CommandArgument, CommandContext, Message } from "@vencord/discord-types";
 import { findByPropsLazy } from "@webpack";
-import { DraftType, FluxDispatcher, Forms, Menu, PermissionsBits, PermissionStore, React, SelectedChannelStore, showToast, Switch, Toasts, UploadManager } from "@webpack/common";
+import { DraftType, FluxDispatcher, Menu, PermissionsBits, PermissionStore, React, SelectedChannelStore, showToast, Toasts, UploadManager } from "@webpack/common";
 
 const Native = VencordNative.pluginHelpers.LargeFileUpload as PluginNative<typeof import("./native")>;
 
@@ -27,53 +27,20 @@ interface ObserverRefs {
     persistCleanup: () => void;
 }
 
-function SettingsComponent(props: { setValue(v: any): void; }) {
-    function updateSetting(key: keyof typeof settings.store, value: any) {
-        if (key in settings.store) {
-            (settings.store as any)[key] = value;
-        } else {
-            console.error(`Invalid setting key: ${key}`);
-        }
-    }
-
-    return (
-        <Forms.FormSection>
-            <Switch
-                value={settings.store.autoSend === "Yes"}
-                onChange={(enabled: boolean) => updateSetting("autoSend", enabled ? "Yes" : "No")}
-                note="Whether to automatically send the links with the uploaded files to chat instead of just pasting them into the chatbox."
-                hideBorder={true}
-            >
-                Auto-Send Uploads To Chat
-            </Switch>
-        </Forms.FormSection>
-    );
-}
-
 const settings = definePluginSettings({
-    autoSend: {
-        type: OptionType.SELECT,
-        options: [
-            { label: "Yes", value: "Yes", default: true },
-            { label: "No", value: "No" },
-        ],
-        description: "Auto-Send",
-        hidden: true
-    },
-    customSettings: {
-        type: OptionType.COMPONENT,
-        component: SettingsComponent,
-        description: "Configure custom uploader settings",
-        hidden: false
+    automaticallySendUploadsToChat: {
+        type: OptionType.BOOLEAN,
+        default: true,
+        description: "Whether to automatically send the links with the uploaded files to chat instead of just pasting them into the chatbox.",
     }
 });
 
 function sendTextToChat(text: string, channelId?: string) {
-    if (settings.store.autoSend === "No") {
-        insertTextIntoChatInputBox(text);
-    } else {
+    if (settings.store.automaticallySendUploadsToChat) {
         const targetChannelId = channelId ?? SelectedChannelStore.getChannelId();
         sendMessage(targetChannelId, { content: text });
+    } else {
+        insertTextIntoChatInputBox(text);
     }
 }
 

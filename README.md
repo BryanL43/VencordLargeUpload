@@ -4,7 +4,7 @@
 A plugin wrapper for Vencord (credits/original repository information remains intact below). This plugin creates a new `Upload a Large File` button in the chat menu and chat command `/fileupload` that reroutes media upload to my server and allows files ranging from 10MB to 2GB in size. The uploaded media will appear as links in the chat once the upload is complete. Videos will show as embeds, but larger ones might not load as expected.
 
 > [!WARNING]
-> Some Discord servers may restrict or filter links and embedded media. If uploads do not appear correctly or are removed, it may be due to server moderation settings or bot restrictions. Always review a server’s rules before sharing external content.
+> Some Discord servers may restrict or filter links and embedded media. If uploads do not appear correctly or are removed, it may be due to server moderation settings or bot restrictions. Always review a server's rules before sharing external content.
 
 <table align="center" border="0" width="100%">
     <tr>
