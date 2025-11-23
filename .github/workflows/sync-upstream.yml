@@ -29,16 +29,16 @@ jobs:
         id: check
         run: |
           upstream_commit=$(git rev-parse upstream/main)
-          local_commit=$(git rev-parse origin/main)
+          merge_base=$(git merge-base upstream/main origin/main)
 
           echo "Upstream: $upstream_commit"
-          echo "Local: $local_commit"
+          echo "Merge base: $merge_base"
 
-          if [ "$upstream_commit" != "$local_commit" ]; then
-            echo "Upstream is ahead. Merge needed."
+          if [ "$merge_base" != "$upstream_commit" ]; then
+            echo "Upstream has commits not in local. Merge needed."
             echo "MERGE_NEEDED=true" >> $GITHUB_ENV
           else
-            echo "No changes. No merge needed."
+            echo "Upstream is fully merged into local. No merge needed."
             echo "MERGE_NEEDED=false" >> $GITHUB_ENV
           fi
 
