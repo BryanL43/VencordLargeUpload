@@ -51,7 +51,7 @@ jobs:
           LAST_ENTRY_LINE=$((RAW_END - 1))
 
           # Search upward from LAST_ENTRY_LINE to find the last "key:" entry
-          LAST_KEY=$(sed -n "1,${LAST_ENTRY_LINE}p" "$FILE" | grep -oP '^\s*\w+(?=:\s*{)' | tail -n 1)
+          LAST_KEY=$(sed -n "1,${LAST_ENTRY_LINE}p" "$FILE" | grep -oP '^\s*\K\w+(?=:\s*{)' | tail -n 1)
 
           echo "Last key detected: $LAST_KEY"
 
