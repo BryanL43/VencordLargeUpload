@@ -48,7 +48,7 @@ jobs:
 
           # Find the line BEFORE the line containing "satisfies Record<string, Dev>"
           RAW_END=$(grep -n "satisfies Record" "$FILE" | cut -d: -f1)
-          LAST_LINE=$((RAW_END - 1))
+          LAST_LINE=$((RAW_END - 2))
 
           if sed -n "${LAST_LINE}p" "$FILE" | grep -q "bryan:"; then
             echo "BRYAN_IS_LAST=true"
