@@ -8,6 +8,8 @@ on:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+        FILE: src/utils/constants.ts
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
@@ -26,39 +28,34 @@ jobs:
           git fetch upstream
 
       - name: Check if upstream is ahead
-        id: check
+        id: check_upstream
         run: |
           upstream_commit=$(git rev-parse upstream/main)
-          local_commit=$(git rev-parse origin/main)
+          merge_base=$(git merge-base upstream/main origin/main)
 
           echo "Upstream: $upstream_commit"
-          echo "Local: $local_commit"
+          echo "Merge base: $merge_base"
 
-          if [ "$upstream_commit" != "$local_commit" ]; then
-            echo "Upstream is ahead. Merge needed."
-            echo "merge_needed=true" >> $GITHUB_ENV
+          if [ "$merge_base" != "$upstream_commit" ]; then
+            echo "Upstream has commits not in local. Merge needed."
+            echo "MERGE_NEEDED=true" >> $GITHUB_OUTPUT
           else
-            echo "No changes. No merge needed."
-            echo "merge_needed=false" >> $GITHUB_ENV
+            echo "Upstream is fully merged into local. No merge needed."
+            echo "MERGE_NEEDED=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Pre-resolve constants.ts by taking upstream version
-        if: env.merge_needed == 'true'
+      - name: Register custom merge driver
         run: |
-          git checkout upstream/main -- src/utils/constants.ts
-          git add src/utils/constants.ts
-          git commit -m "Pre-resolve constants.ts to match upstream" || true
+          git config merge.theirs.driver true
 
       - name: Merge upstream changes
-        if: env.merge_needed == 'true'
+        if: steps.check_upstream.outputs.MERGE_NEEDED == 'true'
         run: |
           git merge upstream/main --no-edit
 
       - name: Reinstate custom Dev entry
-        if: env.merge_needed == 'true'
+        if: steps.check_upstream.outputs.MERGE_NEEDED == 'true'
         run: |
-          FILE=src/utils/constants.ts
-
           # Remove any previous copy of custom dev entries
           sed -i '/^\s*bryan:\s*{/,/^\s*},/d' "$FILE"
 
@@ -77,17 +74,17 @@ jobs:
               }," "$FILE"
 
       - name: Commit custom Dev entry
-        if: env.merge_needed == 'true'
+        if: steps.check_upstream.outputs.MERGE_NEEDED == 'true'
         run: |
-          git add src/utils/constants.ts
+          git add "$FILE"
           git commit -m "Reinsert custom Dev entry" || true
 
       - name: Set up authenticated push
-        if: env.merge_needed == 'true'
+        if: steps.check_upstream.outputs.MERGE_NEEDED == 'true'
         run: |
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
 
       - name: Push changes
-        if: env.merge_needed == 'true'
+        if: steps.check_upstream.outputs.MERGE_NEEDED == 'true'
         run: |
           git push origin main
