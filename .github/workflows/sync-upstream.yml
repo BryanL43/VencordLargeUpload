@@ -66,6 +66,12 @@ jobs:
           RAW_END=$(grep -n "satisfies Record" "$FILE" | cut -d: -f1)
           LAST_LINE=$((RAW_END - 1))
 
+          if grep -q "bryan:" $(sed -n "${LAST_ENTRY_LINE}p" "$FILE"); then
+            echo "BRYAN_IS_LAST=true"
+          else
+            echo "BRYAN_IS_LAST=false"
+          fi
+
           # Ensure the previous final entry ends with a comma
           sed -i "${LAST_LINE}s/}$/},/" "$FILE"
 
