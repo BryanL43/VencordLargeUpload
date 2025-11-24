@@ -50,7 +50,7 @@ jobs:
           RAW_END=$(grep -n "satisfies Record" "$FILE" | cut -d: -f1)
           LAST_LINE=$((RAW_END - 1))
 
-          if grep -q "bryan:" $(sed -n "${LAST_LINE}p" "$FILE"); then
+          if sed -n "${LAST_LINE}p" "$FILE" | grep -q "bryan:"; then
             echo "BRYAN_IS_LAST=true"
           else
             echo "BRYAN_IS_LAST=false"
